@@ -167,4 +167,24 @@ final class ClipVaultChaosPerfTests: XCTestCase {
         XCTAssertNil(appState.recentItems[4].content.imageData, "Item 5 must have raw data evicted")
         XCTAssertNotNil(appState.recentItems[4].content.thumbnailData, "Item 5 must retain micro-thumbnail")
     }
+
+    // SPEED BENCHMARK: 10,000 Search Queries across 50 items
+    func testSearchQuerySpeedBenchmark() {
+        let items = (0..<50).map { i in
+            ClipboardItem(content: .text("Code snippet or document line #\(i): const data = fetch('/api/user/\(i)');"))
+        }
+
+        let query = "api/user"
+        let start = CFAbsoluteTimeGetCurrent()
+        var matchCount = 0
+        for _ in 0..<10_000 {
+            let matches = items.filter { $0.searchIndex.contains(query) }
+            matchCount += matches.count
+        }
+        let elapsed = CFAbsoluteTimeGetCurrent() - start
+        let qps = Int(10_000.0 / elapsed)
+        let latencyMicros = (elapsed / 10_000.0) * 1_000_000
+        print("[SPEED] 10,000 search queries completed in \(elapsed)s (\(qps) queries/sec, \(latencyMicros)µs per search)")
+        XCTAssertLessThan(elapsed, 1.0, "10,000 searches across 50 items should execute in under 1.0 second (faster than 10,000 QPS)")
+    }
 }
