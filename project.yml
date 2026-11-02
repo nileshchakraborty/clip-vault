@@ -1,0 +1,44 @@
+name: ClipVault
+options:
+  bundleIdPrefix: com.clipvault
+  deploymentTarget:
+    macOS: "14.0"
+targets:
+  ClipVault:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: ClipVault
+    info:
+      path: ClipVault/Resources/Info.plist
+      properties:
+        LSUIElement: true
+        CFBundleDisplayName: "ClipVault"
+        CFBundleIdentifier: "com.clipvault.mac"
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+        NSHumanReadableCopyright: "Copyright © 2026. All rights reserved."
+    settings:
+      SWIFT_VERSION: "5.9"
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+      PRODUCT_NAME: "ClipVault"
+      PRODUCT_BUNDLE_IDENTIFIER: "com.clipvault.mac"
+      CODE_SIGN_IDENTITY: "-"
+      CODE_SIGNING_REQUIRED: "NO"
+
+  ClipVaultTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: ClipVaultTests
+    dependencies:
+      - target: ClipVault
+    settings:
+      SWIFT_VERSION: "5.9"
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+      PRODUCT_BUNDLE_IDENTIFIER: "com.clipvault.tests"
+      GENERATE_INFOPLIST_FILE: YES
+      CODE_SIGN_IDENTITY: "-"
+      CODE_SIGNING_REQUIRED: "NO"
