@@ -3,6 +3,7 @@ import SwiftUI
 public struct SearchBarView: View {
     @Binding var text: String
     @Binding var selectedFilter: ContentType?
+    @FocusState private var isFocused: Bool
 
     public init(text: Binding<String>, selectedFilter: Binding<ContentType?>) {
         self._text = text
@@ -14,12 +15,14 @@ public struct SearchBarView: View {
             // Search Input Field
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 13))
+                    .foregroundColor(isFocused ? .accentColor : .secondary)
+                    .font(.system(size: 13, weight: isFocused ? .semibold : .regular))
+                    .animation(.easeInOut(duration: 0.15), value: isFocused)
 
                 TextField("Search history & pinned items...", text: $text)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
+                    .focused($isFocused)
 
                 if !text.isEmpty {
                     Button(action: { text = "" }) {
@@ -28,6 +31,7 @@ public struct SearchBarView: View {
                             .font(.system(size: 13))
                     }
                     .buttonStyle(.plain)
+                    .help("Clear search")
                 }
             }
             .padding(.horizontal, 10)
@@ -36,8 +40,9 @@ public struct SearchBarView: View {
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                    .stroke(isFocused ? Color.accentColor : Color.secondary.opacity(0.2), lineWidth: isFocused ? 1.5 : 1.0)
             )
+            .animation(.easeInOut(duration: 0.15), value: isFocused)
 
             // Filter Chips
             ScrollView(.horizontal, showsIndicators: false) {
@@ -61,6 +66,11 @@ public struct SearchBarView: View {
                     }
                 }
                 .padding(.horizontal, 2)
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isFocused = true
             }
         }
     }

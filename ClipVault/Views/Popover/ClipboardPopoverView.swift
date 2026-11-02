@@ -132,10 +132,60 @@ public struct ClipboardPopoverView: View {
     private var contentList: some View {
         let pinned = appState.filteredPinnedItems
         let recent = appState.filteredRecentItems
+        let isSearching = !appState.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 
         if pinned.isEmpty && recent.isEmpty {
             emptyStateView
+        } else if isSearching {
+            // Dedicated SEARCH RESULTS View
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    searchHeader(count: pinned.count + recent.count, query: appState.searchText)
+
+                    if !pinned.isEmpty {
+                        sectionHeader(title: "PINNED MATCHES", count: pinned.count, icon: "pin.fill", color: .orange)
+
+                        ForEach(pinned) { item in
+                            ClipRowView(
+                                item: item,
+                                shortcutIndex: nil,
+                                searchQuery: appState.searchText,
+                                onCopy: { appState.copyToPasteboard(item) },
+                                onTogglePin: { appState.togglePin(for: item) },
+                                onDelete: { appState.deleteItem(item) }
+                            )
+                        }
+
+                        Divider()
+                            .padding(.vertical, 4)
+                    }
+
+                    if !recent.isEmpty {
+                        sectionHeader(
+                            title: "HISTORY MATCHES",
+                            count: recent.count,
+                            maxCount: appState.settings.maxHistoryLimit,
+                            icon: "clock",
+                            color: .secondary
+                        )
+
+                        ForEach(Array(recent.enumerated()), id: \.element.id) { index, item in
+                            ClipRowView(
+                                item: item,
+                                shortcutIndex: index + 1,
+                                searchQuery: appState.searchText,
+                                onCopy: { appState.copyToPasteboard(item) },
+                                onTogglePin: { appState.togglePin(for: item) },
+                                onDelete: { appState.deleteItem(item) }
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+            }
         } else {
+            // Standard dual section view (Pin Board + Recent History)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     // PIN BOARD SECTION
@@ -146,6 +196,7 @@ public struct ClipboardPopoverView: View {
                             ClipRowView(
                                 item: item,
                                 shortcutIndex: nil,
+                                searchQuery: "",
                                 onCopy: { appState.copyToPasteboard(item) },
                                 onTogglePin: { appState.togglePin(for: item) },
                                 onDelete: { appState.deleteItem(item) }
@@ -170,6 +221,7 @@ public struct ClipboardPopoverView: View {
                             ClipRowView(
                                 item: item,
                                 shortcutIndex: index + 1,
+                                searchQuery: "",
                                 onCopy: { appState.copyToPasteboard(item) },
                                 onTogglePin: { appState.togglePin(for: item) },
                                 onDelete: { appState.deleteItem(item) }
@@ -181,6 +233,35 @@ public struct ClipboardPopoverView: View {
                 .padding(.vertical, 6)
             }
         }
+    }
+
+    private func searchHeader(count: Int, query: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.accentColor)
+
+            Text("SEARCH RESULTS FOR \"\(query)\"")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.accentColor)
+                .lineLimit(1)
+
+            Spacer()
+
+            Text("\(count) match\(count == 1 ? "" : "es")")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(.secondary)
+
+            Button(action: { appState.searchText = "" }) {
+                Text("Clear")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.accentColor)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.top, 4)
+        .padding(.bottom, 6)
     }
 
     private func sectionHeader(title: String, count: Int, maxCount: Int? = nil, icon: String, color: Color) -> some View {
@@ -224,6 +305,13 @@ public struct ClipboardPopoverView: View {
                 Text("Try searching for different keywords")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary.opacity(0.7))
+
+                Button("Clear Search") {
+                    appState.searchText = ""
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .padding(.top, 4)
             } else {
                 Text("Clipboard is empty")
                     .font(.system(size: 13, weight: .medium))

@@ -57,6 +57,7 @@ public struct FloatingHUDView: View {
                                 ClipRowView(
                                     item: item,
                                     shortcutIndex: nil,
+                                    searchQuery: appState.searchText,
                                     onCopy: {
                                         appState.copyToPasteboard(item)
                                         onClose()
@@ -74,6 +75,7 @@ public struct FloatingHUDView: View {
                                 ClipRowView(
                                     item: item,
                                     shortcutIndex: index + 1,
+                                    searchQuery: appState.searchText,
                                     onCopy: {
                                         appState.copyToPasteboard(item)
                                         onClose()
