@@ -7,14 +7,15 @@ public final class PasteboardMonitor {
     private var lastChangeCount: Int
     private var internalCopyCount: Int = -1
     private let pasteboard = NSPasteboard.general
+    private let processingQueue = DispatchQueue(label: "com.clipvault.processing", qos: .userInitiated)
 
     // Adaptive idle state tracking
     private var secondsSinceLastChange: TimeInterval = 0
-    private var currentInterval: TimeInterval = 0.5
+    private var currentInterval: TimeInterval = 0.2
 
     public var onItemDetected: ((ClipboardItem) -> Void)?
 
-    // Memory guards
+    // Memory & Speed guards
     public static let maxTextCharacters: Int = 50_000
     public static let maxRegexCheckLength: Int = 2_048
     public static let maxIngestibleImageBytes: Int = 60 * 1024 * 1024 // Accept up to 60MB raw images
@@ -35,7 +36,7 @@ public final class PasteboardMonitor {
     }
 
     public func startMonitoring() {
-        scheduleTimer(interval: 0.5, tolerance: 0.15)
+        scheduleTimer(interval: 0.2, tolerance: 0.05)
     }
 
     public func stopMonitoring() {
@@ -45,8 +46,8 @@ public final class PasteboardMonitor {
 
     public func resetToActivePolling() {
         secondsSinceLastChange = 0
-        if currentInterval != 0.5 {
-            scheduleTimer(interval: 0.5, tolerance: 0.15)
+        if currentInterval != 0.2 {
+            scheduleTimer(interval: 0.2, tolerance: 0.05)
         }
     }
 
@@ -68,33 +69,37 @@ public final class PasteboardMonitor {
     }
 
     private func checkForChanges() {
-        autoreleasepool {
-            let currentCount = pasteboard.changeCount
-            if currentCount != lastChangeCount {
-                lastChangeCount = currentCount
-                resetToActivePolling()
+        let currentCount = pasteboard.changeCount
+        guard currentCount != lastChangeCount else {
+            secondsSinceLastChange += currentInterval
+            if secondsSinceLastChange >= 300 && currentInterval < 3.5 {
+                scheduleTimer(interval: 3.5, tolerance: 1.0)
+            } else if secondsSinceLastChange >= 30 && currentInterval < 1.5 {
+                scheduleTimer(interval: 1.5, tolerance: 0.5)
+            }
+            return
+        }
 
-                if currentCount == internalCopyCount {
-                    return
-                }
+        lastChangeCount = currentCount
+        resetToActivePolling()
 
-                if isConcealed() {
-                    return
-                }
+        if currentCount == internalCopyCount {
+            return
+        }
 
-                if let item = extractClipboardItem() {
-                    onItemDetected?(item)
-                }
-            } else {
-                // Adaptive idle backoff calculation
-                secondsSinceLastChange += currentInterval
+        if isConcealed() {
+            return
+        }
 
-                if secondsSinceLastChange >= 300 && currentInterval < 3.5 {
-                    // Deep idle after 5 minutes: poll every 3.5 seconds
-                    scheduleTimer(interval: 3.5, tolerance: 1.0)
-                } else if secondsSinceLastChange >= 30 && currentInterval < 1.5 {
-                    // Idle after 30 seconds: poll every 1.5 seconds
-                    scheduleTimer(interval: 1.5, tolerance: 0.5)
+        // Offload payload extraction and thumbnail downsampling to background queue
+        // to maintain 120 FPS buttery UI performance on the Main Thread
+        processingQueue.async { [weak self] in
+            autoreleasepool {
+                guard let self = self else { return }
+                if let item = self.extractClipboardItem() {
+                    DispatchQueue.main.async {
+                        self.onItemDetected?(item)
+                    }
                 }
             }
         }
@@ -116,7 +121,6 @@ public final class PasteboardMonitor {
         if let types = pasteboard.types,
            types.contains(.tiff) || types.contains(.png) {
             if let imgData = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) {
-                // Safeguard: Accept images up to 60MB from the web
                 if imgData.count <= PasteboardMonitor.maxIngestibleImageBytes {
                     let thumbData = generateMicroThumbnail(from: imgData, maxPixelDimension: 96)
                     let safeData = compressOversizedImage(from: imgData, maxDimension: 1920) ?? imgData

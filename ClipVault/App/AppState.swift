@@ -241,12 +241,15 @@ public final class AppState: ObservableObject {
 
     private func filterItems(_ list: [ClipboardItem]) -> [ClipboardItem] {
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmedQuery.isEmpty || selectedFilter != nil else {
+            return list
+        }
         return list.filter { item in
             if let selectedFilter = selectedFilter, item.content.type != selectedFilter {
                 return false
             }
             if !trimmedQuery.isEmpty {
-                return item.searchString.contains(trimmedQuery) || item.previewText.lowercased().contains(trimmedQuery)
+                return item.searchIndex.contains(trimmedQuery)
             }
             return true
         }

@@ -9,6 +9,7 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
     public let previewText: String
     public let byteSize: Int
     public let characterCount: Int
+    public let searchIndex: String
 
     public init(
         id: UUID = UUID(),
@@ -55,6 +56,9 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
             self.characterCount = 0
             self.byteSize = size
         }
+
+        // Pre-compute lowercased search index for instant zero-allocation searching
+        self.searchIndex = (self.previewText + " " + (content.urlString ?? "")).lowercased()
     }
 
     public var typeIcon: String {
@@ -96,11 +100,6 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
     }
 
     public var searchString: String {
-        switch content.type {
-        case .text, .richText, .url, .color:
-            return (content.textValue?.prefix(500) ?? "").lowercased()
-        case .image:
-            return "image photo"
-        }
+        return searchIndex
     }
 }

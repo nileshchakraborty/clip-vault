@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		01F402596C2ADA3F651CA18F /* AboutMeTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95761748F9EDB6CBAF079297 /* AboutMeTab.swift */; };
+		0F10E41318AB5D5A24A6469F /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D1A6D1E246270C8C9963AD /* ThumbnailCache.swift */; };
 		2427BA791CFC539820E6D5E9 /* PrivacyNoticeTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5873FDA5A2144CF30EAEA40 /* PrivacyNoticeTab.swift */; };
 		2F0DD13765B06E080BDEF474 /* PasteboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E84A077FC65783B3D4E59FC /* PasteboardMonitor.swift */; };
 		4654E206D85384C7D5588796 /* ClipVaultApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D3D0F62D2FF479C44EEE31 /* ClipVaultApp.swift */; };
@@ -56,6 +57,7 @@
 		5C47CD9A6B4DE3B05C0A63AB /* HotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyManager.swift; sourceTree = "<group>"; };
 		6341205A0C4110B77968A93D /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
 		78D3D0F62D2FF479C44EEE31 /* ClipVaultApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipVaultApp.swift; sourceTree = "<group>"; };
+		79D1A6D1E246270C8C9963AD /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
 		88E86A9210CA7D9E15FE139C /* ShortcutsSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutsSettingsTab.swift; sourceTree = "<group>"; };
 		8D88125246064C21C15CEF6A /* ClipVaultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipVaultTests.swift; sourceTree = "<group>"; };
 		95761748F9EDB6CBAF079297 /* AboutMeTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutMeTab.swift; sourceTree = "<group>"; };
@@ -109,6 +111,7 @@
 				5C47CD9A6B4DE3B05C0A63AB /* HotKeyManager.swift */,
 				0E84A077FC65783B3D4E59FC /* PasteboardMonitor.swift */,
 				FD4AF513BFC1716202CE297D /* SettingsManager.swift */,
+				79D1A6D1E246270C8C9963AD /* ThumbnailCache.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -294,6 +297,7 @@
 				BB82EE206A89A184DB91E715 /* SettingsWindowManager.swift in Sources */,
 				4914ED0D2208CBFBA5C60AFB /* ShortcutsSettingsTab.swift in Sources */,
 				C2E361DD93807547C65EE644 /* TermsTab.swift in Sources */,
+				0F10E41318AB5D5A24A6469F /* ThumbnailCache.swift in Sources */,
 				FACC1C6DD85BCD065CD72E39 /* ToastView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

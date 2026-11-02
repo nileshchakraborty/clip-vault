@@ -129,7 +129,7 @@ public struct ClipRowView: View {
 
         case .image:
             if let thumbData = item.content.thumbnailData ?? item.content.imageData,
-               let nsImage = NSImage(data: thumbData) {
+               let nsImage = ThumbnailCache.shared.image(for: item.id, data: thumbData) {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
