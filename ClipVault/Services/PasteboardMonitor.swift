@@ -17,7 +17,8 @@ public final class PasteboardMonitor {
     // Memory guards
     public static let maxTextCharacters: Int = 50_000
     public static let maxRegexCheckLength: Int = 2_048
-    public static let maxImageBytes: Int = 2 * 1024 * 1024 // 2MB cap per image
+    public static let maxIngestibleImageBytes: Int = 60 * 1024 * 1024 // Accept up to 60MB raw images
+    public static let maxStoredImageBytes: Int = 800 * 1024 // Compact images > 800KB down to high-res JPEG
 
     // Concealed types from Password Managers and OS security
     private static let concealedTypeIdentifiers: [String] = [
@@ -115,9 +116,11 @@ public final class PasteboardMonitor {
         if let types = pasteboard.types,
            types.contains(.tiff) || types.contains(.png) {
             if let imgData = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) {
-                if imgData.count <= PasteboardMonitor.maxImageBytes {
+                // Safeguard: Accept images up to 60MB from the web
+                if imgData.count <= PasteboardMonitor.maxIngestibleImageBytes {
                     let thumbData = generateMicroThumbnail(from: imgData, maxPixelDimension: 96)
-                    let content = ClipboardContent.image(data: imgData, thumbnailData: thumbData)
+                    let safeData = compressOversizedImage(from: imgData, maxDimension: 1920) ?? imgData
+                    let content = ClipboardContent.image(data: safeData, thumbnailData: thumbData)
                     return ClipboardItem(content: content)
                 }
             }
@@ -176,6 +179,20 @@ public final class PasteboardMonitor {
         guard let cgThumb = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
         let bitmapRep = NSBitmapImageRep(cgImage: cgThumb)
         return bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.7])
+    }
+
+    private func compressOversizedImage(from data: Data, maxDimension: Int) -> Data? {
+        guard data.count > PasteboardMonitor.maxStoredImageBytes else { return data }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxDimension
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
+        return bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.85])
     }
 
     private func parseHexColor(_ text: String) -> String? {
