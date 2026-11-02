@@ -4,12 +4,21 @@ cask "clip-vault" do
 
   url "https://github.com/nileshchakraborty/clip-vault/releases/download/v#{version}/ClipVault-#{version}.dmg"
   name "ClipVault"
-  desc "Lightweight, privacy-first, RAM-only macOS clipboard history manager"
+  desc "Lightweight, privacy-first, RAM-only clipboard history manager"
   homepage "https://github.com/nileshchakraborty/clip-vault"
 
-  depends_on macos: ">= :sonoma"
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  depends_on :macos
 
   app "ClipVault.app"
+
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-d", "com.apple.quarantine", "{{appdir}}/ClipVault.app"], must_succeed: false
+  end
 
   zap trash: [
     "~/Library/Application Support/com.clipvault.mac",
