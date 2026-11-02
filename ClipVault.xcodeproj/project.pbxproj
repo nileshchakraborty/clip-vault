@@ -14,6 +14,7 @@
 		480F647A4A3E015513BF37FA /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F89BDC9AB759074A6BD814 /* AppDelegate.swift */; };
 		4914ED0D2208CBFBA5C60AFB /* ShortcutsSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E86A9210CA7D9E15FE139C /* ShortcutsSettingsTab.swift */; };
 		4E0E728943D12ACDBAC22F66 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA4F4B3CAEDC58BC2D15B7A /* SettingsView.swift */; };
+		696135927D4AED13B7AD00D5 /* ClipVaultChaosPerfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D6964F3D5378E567933AB26 /* ClipVaultChaosPerfTests.swift */; };
 		6DCBA38B80C510222D0E2604 /* HistorySettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = F478D7CC5BF3309CBAEDE815 /* HistorySettingsTab.swift */; };
 		8A2C17559B54D14A7D735CC0 /* ClipboardItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CED8A7AE6954AAD9C06D3F5 /* ClipboardItem.swift */; };
 		8D78ED165F43BF80142DA19B /* SearchBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 124FF70D26EC7127C7675674 /* SearchBarView.swift */; };
@@ -43,6 +44,7 @@
 
 /* Begin PBXFileReference section */
 		00CDA2832C48DDC3EFB8EF91 /* TermsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TermsTab.swift; sourceTree = "<group>"; };
+		0D6964F3D5378E567933AB26 /* ClipVaultChaosPerfTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipVaultChaosPerfTests.swift; sourceTree = "<group>"; };
 		0E84A077FC65783B3D4E59FC /* PasteboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteboardMonitor.swift; sourceTree = "<group>"; };
 		124FF70D26EC7127C7675674 /* SearchBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchBarView.swift; sourceTree = "<group>"; };
 		127A8F701CFE592E789317D1 /* SettingsWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowManager.swift; sourceTree = "<group>"; };
@@ -165,6 +167,7 @@
 		C12EE0C999AD5AF9BFDA8E56 /* ClipVaultTests */ = {
 			isa = PBXGroup;
 			children = (
+				0D6964F3D5378E567933AB26 /* ClipVaultChaosPerfTests.swift */,
 				8D88125246064C21C15CEF6A /* ClipVaultTests.swift */,
 			);
 			path = ClipVaultTests;
@@ -299,6 +302,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				696135927D4AED13B7AD00D5 /* ClipVaultChaosPerfTests.swift in Sources */,
 				B5BD9D62FF334A304D9299D6 /* ClipVaultTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

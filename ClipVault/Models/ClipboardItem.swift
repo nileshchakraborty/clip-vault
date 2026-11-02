@@ -24,13 +24,16 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
         switch content.type {
         case .text:
             let text = content.textValue ?? ""
-            self.previewText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Cap previewText to 500 characters to keep memory footprint light
+            let trimmed = text.prefix(500).trimmingCharacters(in: .whitespacesAndNewlines)
+            self.previewText = content.isTruncated ? "\(trimmed) … [Truncated]" : trimmed
             self.characterCount = text.count
             self.byteSize = text.utf8.count
 
         case .richText:
             let text = content.textValue ?? ""
-            self.previewText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = text.prefix(500).trimmingCharacters(in: .whitespacesAndNewlines)
+            self.previewText = content.isTruncated ? "\(trimmed) … [Truncated]" : trimmed
             self.characterCount = text.count
             self.byteSize = content.rtfData?.count ?? text.utf8.count
 
@@ -78,7 +81,8 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
     public var metadataDescription: String {
         switch content.type {
         case .text, .richText:
-            return "\(characterCount) chars • \(formattedTime)"
+            let truncNotice = content.isTruncated ? " • Truncated" : ""
+            return "\(characterCount) chars • \(formattedTime)\(truncNotice)"
         case .url:
             if let url = URL(string: content.urlString ?? ""), let host = url.host {
                 return "\(host) • \(formattedTime)"
@@ -94,7 +98,7 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
     public var searchString: String {
         switch content.type {
         case .text, .richText, .url, .color:
-            return (content.textValue ?? "").lowercased()
+            return (content.textValue?.prefix(500) ?? "").lowercased()
         case .image:
             return "image photo"
         }

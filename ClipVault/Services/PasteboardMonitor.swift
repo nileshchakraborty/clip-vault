@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ImageIO
 
 public final class PasteboardMonitor {
     private var timer: Timer?
@@ -8,6 +9,11 @@ public final class PasteboardMonitor {
     private let pasteboard = NSPasteboard.general
 
     public var onItemDetected: ((ClipboardItem) -> Void)?
+
+    // Memory guards
+    public static let maxTextCharacters: Int = 50_000
+    public static let maxRegexCheckLength: Int = 2_048
+    public static let maxImageBytes: Int = 2 * 1024 * 1024 // 2MB cap per image
 
     // Concealed types from Password Managers and OS security
     private static let concealedTypeIdentifiers: [String] = [
@@ -25,9 +31,13 @@ public final class PasteboardMonitor {
 
     public func startMonitoring(interval: TimeInterval = 0.5) {
         stopMonitoring()
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        let t = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             self?.checkForChanges()
         }
+        // Coalesce timer with 0.2s tolerance for battery and CPU efficiency
+        t.tolerance = 0.2
+        RunLoop.main.add(t, forMode: .common)
+        self.timer = t
     }
 
     public func stopMonitoring() {
@@ -36,28 +46,27 @@ public final class PasteboardMonitor {
     }
 
     public func notifyInternalCopy() {
-        // Track the next changeCount as an app-originated copy to prevent self-duplication
         self.internalCopyCount = pasteboard.changeCount
     }
 
     private func checkForChanges() {
-        let currentCount = pasteboard.changeCount
-        guard currentCount != lastChangeCount else { return }
+        autoreleasepool {
+            let currentCount = pasteboard.changeCount
+            guard currentCount != lastChangeCount else { return }
 
-        lastChangeCount = currentCount
+            lastChangeCount = currentCount
 
-        // If this was an internal copy by ClipVault, update tracking and skip
-        if currentCount == internalCopyCount {
-            return
-        }
+            if currentCount == internalCopyCount {
+                return
+            }
 
-        // Check if item contains concealed/password manager markers
-        if isConcealed() {
-            return
-        }
+            if isConcealed() {
+                return
+            }
 
-        if let item = extractClipboardItem() {
-            onItemDetected?(item)
+            if let item = extractClipboardItem() {
+                onItemDetected?(item)
+            }
         }
     }
 
@@ -77,43 +86,67 @@ public final class PasteboardMonitor {
         if let types = pasteboard.types,
            types.contains(.tiff) || types.contains(.png) {
             if let imgData = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) {
-                // Safeguard: Limit in-memory image size to 5MB
-                if imgData.count <= 5 * 1024 * 1024 {
-                    let content = ClipboardContent.image(data: imgData)
+                if imgData.count <= PasteboardMonitor.maxImageBytes {
+                    let thumbData = generateMicroThumbnail(from: imgData, maxPixelDimension: 96)
+                    let content = ClipboardContent.image(data: imgData, thumbnailData: thumbData)
                     return ClipboardItem(content: content)
                 }
             }
         }
 
         // 2. Check for Plain Text / String
-        if let string = pasteboard.string(forType: .string) {
-            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let rawString = pasteboard.string(forType: .string) {
+            let trimmed = rawString.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
 
-            // Check if it's a Hex Color (e.g. #FF5733 or #333 or FF5733)
-            if let hexColor = parseHexColor(trimmed) {
-                let content = ClipboardContent.color(hex: hexColor)
-                return ClipboardItem(content: content)
-            }
+            let isTruncated = trimmed.count > PasteboardMonitor.maxTextCharacters
+            let safeString = isTruncated
+                ? String(trimmed.prefix(PasteboardMonitor.maxTextCharacters))
+                : trimmed
 
-            // Check if it's a URL
-            if let url = parseURL(trimmed) {
-                let content = ClipboardContent.url(url)
-                return ClipboardItem(content: content)
+            // Fast-path: Only check regex if string is short enough (< 2048 characters)
+            if trimmed.count <= PasteboardMonitor.maxRegexCheckLength {
+                if let hexColor = parseHexColor(trimmed) {
+                    let content = ClipboardContent.color(hex: hexColor)
+                    return ClipboardItem(content: content)
+                }
+
+                if let url = parseURL(trimmed) {
+                    let content = ClipboardContent.url(url)
+                    return ClipboardItem(content: content)
+                }
             }
 
             // Check for Rich Text (RTF)
             if let rtfData = pasteboard.data(forType: .rtf) {
-                let content = ClipboardContent.richText(data: rtfData, plainString: string)
+                let safeRTFData = rtfData.count <= 1_000_000 ? rtfData : nil
+                let content = ClipboardContent.richText(
+                    data: safeRTFData ?? Data(),
+                    plainString: safeString,
+                    isTruncated: isTruncated
+                )
                 return ClipboardItem(content: content)
             }
 
             // Standard Plain Text
-            let content = ClipboardContent.text(string)
+            let content = ClipboardContent.text(safeString, isTruncated: isTruncated)
             return ClipboardItem(content: content)
         }
 
         return nil
+    }
+
+    private func generateMicroThumbnail(from data: Data, maxPixelDimension: Int) -> Data? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelDimension
+        ]
+        guard let cgThumb = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        let bitmapRep = NSBitmapImageRep(cgImage: cgThumb)
+        return bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.7])
     }
 
     private func parseHexColor(_ text: String) -> String? {

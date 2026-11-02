@@ -128,7 +128,8 @@ public struct ClipRowView: View {
             }
 
         case .image:
-            if let imgData = item.content.imageData, let nsImage = NSImage(data: imgData) {
+            if let thumbData = item.content.thumbnailData ?? item.content.imageData,
+               let nsImage = NSImage(data: thumbData) {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)

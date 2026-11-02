@@ -14,27 +14,33 @@ public struct ClipboardContent: Codable, Equatable {
     public let textValue: String?
     public let rtfData: Data?
     public let imageData: Data?
+    public let thumbnailData: Data?
     public let urlString: String?
     public let hexColor: String?
+    public let isTruncated: Bool
 
     public init(
         type: ContentType,
         textValue: String? = nil,
         rtfData: Data? = nil,
         imageData: Data? = nil,
+        thumbnailData: Data? = nil,
         urlString: String? = nil,
-        hexColor: String? = nil
+        hexColor: String? = nil,
+        isTruncated: Bool = false
     ) {
         self.type = type
         self.textValue = textValue
         self.rtfData = rtfData
         self.imageData = imageData
+        self.thumbnailData = thumbnailData
         self.urlString = urlString
         self.hexColor = hexColor
+        self.isTruncated = isTruncated
     }
 
-    public static func text(_ str: String) -> ClipboardContent {
-        ClipboardContent(type: .text, textValue: str)
+    public static func text(_ str: String, isTruncated: Bool = false) -> ClipboardContent {
+        ClipboardContent(type: .text, textValue: str, isTruncated: isTruncated)
     }
 
     public static func url(_ url: URL) -> ClipboardContent {
@@ -45,11 +51,11 @@ public struct ClipboardContent: Codable, Equatable {
         ClipboardContent(type: .color, textValue: hex, hexColor: hex)
     }
 
-    public static func image(data: Data) -> ClipboardContent {
-        ClipboardContent(type: .image, imageData: data)
+    public static func image(data: Data, thumbnailData: Data?) -> ClipboardContent {
+        ClipboardContent(type: .image, imageData: data, thumbnailData: thumbnailData)
     }
 
-    public static func richText(data: Data, plainString: String) -> ClipboardContent {
-        ClipboardContent(type: .richText, textValue: plainString, rtfData: data)
+    public static func richText(data: Data, plainString: String, isTruncated: Bool = false) -> ClipboardContent {
+        ClipboardContent(type: .richText, textValue: plainString, rtfData: data, isTruncated: isTruncated)
     }
 }
