@@ -1,6 +1,7 @@
 import XCTest
 @testable import ClipVault
 
+@MainActor
 final class ClipVaultTests: XCTestCase {
     var appState: AppState!
 

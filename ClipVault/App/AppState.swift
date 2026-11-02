@@ -2,13 +2,18 @@ import AppKit
 import SwiftUI
 import Combine
 
+@MainActor
 public final class AppState: ObservableObject {
     public static let shared = AppState()
 
     // MARK: - Published Properties
     @Published public var recentItems: [ClipboardItem] = []
     @Published public var pinnedItems: [ClipboardItem] = []
-    @Published public var searchText: String = ""
+    @Published public var searchText: String = "" {
+        didSet {
+            monitor.resetToActivePolling()
+        }
+    }
     @Published public var selectedFilter: ContentType? = nil
     @Published public var toastMessage: String? = nil
     @Published public var showSettingsWindow: Bool = false
@@ -17,6 +22,7 @@ public final class AppState: ObservableObject {
     public let settings = SettingsManager.shared
     private let monitor = PasteboardMonitor()
     private var cancellables = Set<AnyCancellable>()
+    private var memoryPressureSource: DispatchSourceMemoryPressure?
 
     // MARK: - File URLs for Opt-in Pinned Persistence
     private var pinnedStorageURL: URL {
@@ -30,6 +36,7 @@ public final class AppState: ObservableObject {
     public init() {
         setupMonitor()
         setupSettingsObserver()
+        setupMemoryPressureHandler()
         loadPersistedPinnedItemsIfNeeded()
     }
 
@@ -61,21 +68,38 @@ public final class AppState: ObservableObject {
             .store(in: &cancellables)
     }
 
+    // MARK: - Memory Pressure Resilience
+    private func setupMemoryPressureHandler() {
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
+        source.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            let event = source.data
+            if event.contains(.critical) {
+                // Critical system pressure: trim recent items down to 5 and shed heavy buffers
+                if self.recentItems.count > 5 {
+                    self.recentItems = Array(self.recentItems.prefix(5))
+                }
+                self.enforceTieredImageRetention(keepFullCount: 1)
+            } else if event.contains(.warning) {
+                // Warning pressure: keep full buffers for only top 2 images
+                self.enforceTieredImageRetention(keepFullCount: 2)
+            }
+        }
+        source.resume()
+        self.memoryPressureSource = source
+    }
+
     // MARK: - Clipboard Ingestion
     public func handleNewClipboardItem(_ item: ClipboardItem) {
-        // If already in pinned items, do not duplicate into recent items
         if pinnedItems.contains(where: { isContentEqual($0.content, item.content) }) {
             return
         }
 
-        // Remove any existing duplicate in recent items so it bumps to the top
         recentItems.removeAll(where: { isContentEqual($0.content, item.content) })
-
-        // Insert at the beginning
         recentItems.insert(item, at: 0)
 
-        // Enforce max limit
         enforceHistoryLimit(settings.maxHistoryLimit)
+        enforceTieredImageRetention(keepFullCount: 3)
     }
 
     private func isContentEqual(_ a: ClipboardContent, _ b: ClipboardContent) -> Bool {
@@ -86,7 +110,7 @@ public final class AppState: ObservableObject {
         case .richText:
             return a.textValue == b.textValue
         case .image:
-            return a.imageData == b.imageData
+            return a.imageData == b.imageData || (a.thumbnailData != nil && a.thumbnailData == b.thumbnailData)
         }
     }
 
@@ -97,17 +121,37 @@ public final class AppState: ObservableObject {
         }
     }
 
+    // Retain heavy raw image data for top 3 items only; older items retain micro-thumbnails (~3KB)
+    private func enforceTieredImageRetention(keepFullCount: Int) {
+        var imageCount = 0
+        for i in 0..<recentItems.count {
+            if recentItems[i].content.type == .image {
+                imageCount += 1
+                if imageCount > keepFullCount {
+                    if recentItems[i].content.imageData != nil {
+                        var updatedContent = recentItems[i].content
+                        updatedContent.evictRawImageData()
+                        recentItems[i] = ClipboardItem(
+                            id: recentItems[i].id,
+                            createdAt: recentItems[i].createdAt,
+                            content: updatedContent,
+                            isPinned: recentItems[i].isPinned
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Actions
     public func togglePin(for item: ClipboardItem) {
         if let index = pinnedItems.firstIndex(where: { $0.id == item.id }) {
-            // Unpin: remove from pinned and put at top of recent
             var unpinned = pinnedItems.remove(at: index)
             unpinned.isPinned = false
             recentItems.insert(unpinned, at: 0)
             enforceHistoryLimit(settings.maxHistoryLimit)
             showToast("Unpinned item")
         } else if let index = recentItems.firstIndex(where: { $0.id == item.id }) {
-            // Pin: remove from recent and add to pinned
             var pinned = recentItems.remove(at: index)
             pinned.isPinned = true
             pinnedItems.insert(pinned, at: 0)
@@ -163,12 +207,11 @@ public final class AppState: ObservableObject {
                 pb.setString(text, forType: .string)
             }
         case .image:
-            if let data = item.content.imageData {
+            if let data = item.content.imageData ?? item.content.thumbnailData {
                 pb.setData(data, forType: .png)
             }
         }
 
-        // Notify monitor to ignore this changeCount
         monitor.notifyInternalCopy()
 
         if settings.soundEffectsEnabled {
@@ -199,11 +242,9 @@ public final class AppState: ObservableObject {
     private func filterItems(_ list: [ClipboardItem]) -> [ClipboardItem] {
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return list.filter { item in
-            // Filter by type if selected
             if let selectedFilter = selectedFilter, item.content.type != selectedFilter {
                 return false
             }
-            // Filter by query
             if !trimmedQuery.isEmpty {
                 return item.searchString.contains(trimmedQuery) || item.previewText.lowercased().contains(trimmedQuery)
             }

@@ -13,7 +13,7 @@ public struct ClipboardContent: Codable, Equatable {
     public let type: ContentType
     public let textValue: String?
     public let rtfData: Data?
-    public let imageData: Data?
+    public var imageData: Data?
     public let thumbnailData: Data?
     public let urlString: String?
     public let hexColor: String?
@@ -51,11 +51,15 @@ public struct ClipboardContent: Codable, Equatable {
         ClipboardContent(type: .color, textValue: hex, hexColor: hex)
     }
 
-    public static func image(data: Data, thumbnailData: Data?) -> ClipboardContent {
+    public static func image(data: Data?, thumbnailData: Data?) -> ClipboardContent {
         ClipboardContent(type: .image, imageData: data, thumbnailData: thumbnailData)
     }
 
     public static func richText(data: Data, plainString: String, isTruncated: Bool = false) -> ClipboardContent {
         ClipboardContent(type: .richText, textValue: plainString, rtfData: data, isTruncated: isTruncated)
+    }
+
+    public mutating func evictRawImageData() {
+        self.imageData = nil
     }
 }

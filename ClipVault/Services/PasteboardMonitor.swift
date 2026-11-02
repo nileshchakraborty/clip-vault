@@ -8,6 +8,10 @@ public final class PasteboardMonitor {
     private var internalCopyCount: Int = -1
     private let pasteboard = NSPasteboard.general
 
+    // Adaptive idle state tracking
+    private var secondsSinceLastChange: TimeInterval = 0
+    private var currentInterval: TimeInterval = 0.5
+
     public var onItemDetected: ((ClipboardItem) -> Void)?
 
     // Memory guards
@@ -29,15 +33,8 @@ public final class PasteboardMonitor {
         self.lastChangeCount = pasteboard.changeCount
     }
 
-    public func startMonitoring(interval: TimeInterval = 0.5) {
-        stopMonitoring()
-        let t = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
-            self?.checkForChanges()
-        }
-        // Coalesce timer with 0.2s tolerance for battery and CPU efficiency
-        t.tolerance = 0.2
-        RunLoop.main.add(t, forMode: .common)
-        self.timer = t
+    public func startMonitoring() {
+        scheduleTimer(interval: 0.5, tolerance: 0.15)
     }
 
     public func stopMonitoring() {
@@ -45,27 +42,59 @@ public final class PasteboardMonitor {
         timer = nil
     }
 
+    public func resetToActivePolling() {
+        secondsSinceLastChange = 0
+        if currentInterval != 0.5 {
+            scheduleTimer(interval: 0.5, tolerance: 0.15)
+        }
+    }
+
+    private func scheduleTimer(interval: TimeInterval, tolerance: TimeInterval) {
+        timer?.invalidate()
+        currentInterval = interval
+
+        let t = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            self?.checkForChanges()
+        }
+        t.tolerance = tolerance
+        RunLoop.main.add(t, forMode: .common)
+        self.timer = t
+    }
+
     public func notifyInternalCopy() {
         self.internalCopyCount = pasteboard.changeCount
+        resetToActivePolling()
     }
 
     private func checkForChanges() {
         autoreleasepool {
             let currentCount = pasteboard.changeCount
-            guard currentCount != lastChangeCount else { return }
+            if currentCount != lastChangeCount {
+                lastChangeCount = currentCount
+                resetToActivePolling()
 
-            lastChangeCount = currentCount
+                if currentCount == internalCopyCount {
+                    return
+                }
 
-            if currentCount == internalCopyCount {
-                return
-            }
+                if isConcealed() {
+                    return
+                }
 
-            if isConcealed() {
-                return
-            }
+                if let item = extractClipboardItem() {
+                    onItemDetected?(item)
+                }
+            } else {
+                // Adaptive idle backoff calculation
+                secondsSinceLastChange += currentInterval
 
-            if let item = extractClipboardItem() {
-                onItemDetected?(item)
+                if secondsSinceLastChange >= 300 && currentInterval < 3.5 {
+                    // Deep idle after 5 minutes: poll every 3.5 seconds
+                    scheduleTimer(interval: 3.5, tolerance: 1.0)
+                } else if secondsSinceLastChange >= 30 && currentInterval < 1.5 {
+                    // Idle after 30 seconds: poll every 1.5 seconds
+                    scheduleTimer(interval: 1.5, tolerance: 0.5)
+                }
             }
         }
     }

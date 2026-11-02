@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 
+@MainActor
 public final class SettingsManager: ObservableObject {
     public static let shared = SettingsManager()
 
@@ -9,10 +10,7 @@ public final class SettingsManager: ObservableObject {
         static let maxHistoryLimit = "maxHistoryLimit"
         static let persistPinnedItems = "persistPinnedItems"
         static let enableGlobalHotKey = "enableGlobalHotKey"
-        static let globalHotKeyModifier = "globalHotKeyModifier"
-        static let globalHotKeyCode = "globalHotKeyCode"
         static let soundEffectsEnabled = "soundEffectsEnabled"
-        static let showLineNumbersInPreview = "showLineNumbersInPreview"
     }
 
     // MARK: - Constants
@@ -24,7 +22,6 @@ public final class SettingsManager: ObservableObject {
     // MARK: - Published Properties
     @Published public var maxHistoryLimit: Int {
         didSet {
-            // Strictly clamp to [1, 50]
             let clamped = min(max(SettingsManager.minAllowedLimit, maxHistoryLimit), SettingsManager.maxAllowedLimit)
             if maxHistoryLimit != clamped {
                 maxHistoryLimit = clamped
@@ -52,7 +49,7 @@ public final class SettingsManager: ObservableObject {
     }
 
     // MARK: - Initialization
-    private init() {
+    public init() {
         let savedLimit = UserDefaults.standard.integer(forKey: Keys.maxHistoryLimit)
         self.maxHistoryLimit = savedLimit > 0 ? min(savedLimit, SettingsManager.maxAllowedLimit) : 15
 

@@ -1,6 +1,7 @@
 import XCTest
 @testable import ClipVault
 
+@MainActor
 final class ClipVaultChaosPerfTests: XCTestCase {
     var appState: AppState!
 
@@ -68,7 +69,6 @@ final class ClipVaultChaosPerfTests: XCTestCase {
 
     // CHAOS TEST 3: Gigantic Text Payload & Truncation Guard (5 MB text string)
     func testChaosGiganticTextPayload() {
-        // Create a 5MB text string
         let largeChunk = String(repeating: "A1B2C3D4E5F6G7H8I9J0", count: 250_000) // ~5MB
         let item = ClipboardItem(content: .text(largeChunk, isTruncated: true))
 
@@ -86,12 +86,12 @@ final class ClipVaultChaosPerfTests: XCTestCase {
     // CHAOS TEST 4: Malformed Data & Unicode Fuzzing
     func testChaosMalformedAndFuzzedStrings() {
         let fuzzedStrings = [
-            "", // empty
-            "\0\0\0\u{0000}\u{FFFF}", // null bytes and extreme code points
-            String(repeating: "﷽", count: 10_000), // multi-byte complex ligature
-            String(repeating: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", count: 5_000), // complex multi-codepoint flag emojis
-            String(repeating: "\u{202E}RTL-OVERRIDE", count: 1_000), // bidi overrides
-            "<script>alert('xss')</script>\"'--", // injection payload
+            "",
+            "\0\0\0\u{0000}\u{FFFF}",
+            String(repeating: "﷽", count: 10_000),
+            String(repeating: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", count: 5_000),
+            String(repeating: "\u{202E}RTL-OVERRIDE", count: 1_000),
+            "<script>alert('xss')</script>\"'--",
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
         ]
 
@@ -111,7 +111,6 @@ final class ClipVaultChaosPerfTests: XCTestCase {
     func testSaturationMemoryFootprint() {
         appState.settings.maxHistoryLimit = 50
 
-        // Fill with 50 diverse items
         for i in 0..<50 {
             if i % 3 == 0 {
                 let url = URL(string: "https://example.com/page/\(i)?query=parameter")!
@@ -126,36 +125,46 @@ final class ClipVaultChaosPerfTests: XCTestCase {
 
         XCTAssertEqual(appState.recentItems.count, 50)
 
-        // Clear All and verify store returns to 0
         appState.clearAll(includingPinned: true)
         XCTAssertEqual(appState.recentItems.count, 0)
         XCTAssertEqual(appState.pinnedItems.count, 0)
     }
 
-    // CHAOS TEST 6: Micro-Thumbnail Generation Benchmark
-    func testMicroThumbnailGenerationSpeed() {
-        // Create 1000x1000 dummy bitmap
-        let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: 1000,
-            pixelsHigh: 1000,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bytesPerRow: 4000,
-            bitsPerPixel: 32
-        )!
-        let pngData = rep.representation(using: .png, properties: [:])!
+    // CHAOS TEST 6: Tiered LRU Image Retention (Verifies that items >3 have raw data evicted)
+    func testTieredLRUImageRetention() {
+        appState.settings.maxHistoryLimit = 50
 
-        let startTime = CFAbsoluteTimeGetCurrent()
-        let monitor = PasteboardMonitor()
-        // Access extraction or thumbnail generation
-        let item = ClipboardItem(content: .image(data: pngData, thumbnailData: nil))
-        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+        // Create 5 distinct dummy images
+        for i in 0..<5 {
+            let width = 50 + i
+            let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: width,
+                pixelsHigh: 50,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: width * 4,
+                bitsPerPixel: 32
+            )!
+            let pngData = rep.representation(using: .png, properties: [:])!
+            let item = ClipboardItem(content: .image(data: pngData, thumbnailData: pngData))
+            appState.handleNewClipboardItem(item)
+        }
 
-        print("[PERF] Image item initialization took \(elapsed)s")
-        XCTAssertLessThan(elapsed, 0.05)
+        XCTAssertEqual(appState.recentItems.count, 5, "Store must contain 5 distinct images")
+
+        // The newest 3 items should keep full raw imageData
+        XCTAssertNotNil(appState.recentItems[0].content.imageData, "Top 1 item must retain full raw image data")
+        XCTAssertNotNil(appState.recentItems[1].content.imageData, "Top 2 item must retain full raw image data")
+        XCTAssertNotNil(appState.recentItems[2].content.imageData, "Top 3 item must retain full raw image data")
+
+        // Items 4 and 5 must have had raw imageData evicted while keeping micro-thumbnail!
+        XCTAssertNil(appState.recentItems[3].content.imageData, "Item 4 must have raw data evicted")
+        XCTAssertNotNil(appState.recentItems[3].content.thumbnailData, "Item 4 must retain micro-thumbnail")
+        XCTAssertNil(appState.recentItems[4].content.imageData, "Item 5 must have raw data evicted")
+        XCTAssertNotNil(appState.recentItems[4].content.thumbnailData, "Item 5 must retain micro-thumbnail")
     }
 }
